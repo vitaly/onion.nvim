@@ -3,6 +3,7 @@
 ---@field log_level? number Log level for debugging (vim.log.levels.*)
 ---@field auto_save? boolean Automatically save on every change (default: false)
 ---@field auto_save_on_exit? boolean Automatically save on nvim exit (default: false)
+---@field defaults? table<string, table> Default values to set (namespace -> defaults)
 
 ---@class OnionConfig
 ---@field private _defaults table
@@ -265,6 +266,13 @@ function M.setup(opts)
     auto_save_on_exit = opts.auto_save_on_exit or false,
   }
   M.set_defaults('onion', { config = config_defaults })
+
+  -- Apply user-provided defaults
+  if opts.defaults then
+    for namespace, defaults in pairs(opts.defaults) do
+      M.set_defaults(namespace, defaults)
+    end
+  end
 
   log(vim.log.levels.DEBUG, 'setup called with opts: %s', vim.inspect(opts))
 

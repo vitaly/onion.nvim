@@ -252,6 +252,19 @@ describe('onion.config', function()
       config.setup()
       assert.are.equal(vim.log.levels.WARN, config.get('onion.config.log_level'))
     end)
+
+    it('applies defaults from opts.defaults', function()
+      config.setup({
+        defaults = {
+          formatting = { enabled = true, indent = 2 },
+          lsp = { servers = { lua_ls = {} } },
+        },
+      })
+
+      assert.are.equal(true, config.get('formatting.enabled'))
+      assert.are.equal(2, config.get('formatting.indent'))
+      assert.are.same({}, config.get('lsp.servers.lua_ls'))
+    end)
   end)
 
   describe('save', function()
