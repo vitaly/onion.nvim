@@ -70,9 +70,29 @@ describe('onion.config', function()
   end)
 
   describe('set_defaults', function()
-    it('sets defaults for a namespace', function()
+    it('sets defaults for a path with table value', function()
       config.set_defaults('formatting', { enabled = true })
       assert.are.equal(true, config.get('formatting.enabled'))
+    end)
+
+    it('sets defaults for a path with string value', function()
+      config.set_defaults('colorscheme', 'tokyo-night')
+      assert.are.equal('tokyo-night', config.get('colorscheme'))
+    end)
+
+    it('sets defaults for a path with number value', function()
+      config.set_defaults('indent_size', 4)
+      assert.are.equal(4, config.get('indent_size'))
+    end)
+
+    it('sets defaults for a path with boolean value', function()
+      config.set_defaults('dark_mode', true)
+      assert.are.equal(true, config.get('dark_mode'))
+    end)
+
+    it('sets defaults using dot notation path', function()
+      config.set_defaults('editor.colorscheme', 'gruvbox')
+      assert.are.equal('gruvbox', config.get('editor.colorscheme'))
     end)
 
     it('merges multiple set_defaults calls', function()
@@ -256,11 +276,13 @@ describe('onion.config', function()
     it('applies defaults from opts.defaults', function()
       config.setup({
         defaults = {
+          colorscheme = 'tokyo-night',
           formatting = { enabled = true, indent = 2 },
-          lsp = { servers = { lua_ls = {} } },
+          ['lsp.servers'] = { lua_ls = {} },
         },
       })
 
+      assert.are.equal('tokyo-night', config.get('colorscheme'))
       assert.are.equal(true, config.get('formatting.enabled'))
       assert.are.equal(2, config.get('formatting.indent'))
       assert.are.same({}, config.get('lsp.servers.lua_ls'))

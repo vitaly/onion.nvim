@@ -3,7 +3,7 @@
 ---@field log_level? number Log level for debugging (vim.log.levels.*)
 ---@field auto_save? boolean Automatically save on every change (default: false)
 ---@field auto_save_on_exit? boolean Automatically save on nvim exit (default: false)
----@field defaults? table<string, table> Default values to set (namespace -> defaults)
+---@field defaults? table<string, any> Default values to set (path -> value)
 
 ---@class OnionConfig
 ---@field private _defaults table
@@ -130,15 +130,21 @@ local function maybe_auto_save()
   end
 end
 
----Set default values for a namespace
----@param namespace string
----@param defaults table
-function M.set_defaults(namespace, defaults)
-  log(vim.log.levels.DEBUG, 'setting defaults for namespace: %s', namespace)
-  if M._defaults[namespace] == nil then
-    M._defaults[namespace] = {}
+---Set default value(s) using dot notation path
+---@param path string Dot-notation path (e.g., 'colorscheme' or 'lsp.servers')
+---@param value any The default value (can be any type)
+function M.set_defaults(path, value)
+  log(vim.log.levels.DEBUG, 'setting defaults for path: %s', path)
+  if type(value) == 'table' then
+    local existing = get_by_path(M._defaults, path)
+    if type(existing) == 'table' then
+      set_by_path(M._defaults, path, deep_merge(existing, value))
+    else
+      set_by_path(M._defaults, path, value)
+    end
+  else
+    set_by_path(M._defaults, path, value)
   end
-  M._defaults[namespace] = deep_merge(M._defaults[namespace], defaults)
   update_merged()
 end
 
@@ -265,7 +271,7 @@ function M.setup(opts)
     auto_save = opts.auto_save or false,
     auto_save_on_exit = opts.auto_save_on_exit or false,
   }
-  M.set_defaults('onion', { config = config_defaults })
+  M.set_defaults('onion.config', config_defaults)
 
   -- Apply user-provided defaults
   if opts.defaults then
