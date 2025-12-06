@@ -19,7 +19,8 @@ M._merged = {}
 ---@param msg string
 ---@param ... any
 local function log(level, msg, ...)
-  local log_level = M.get('onion.config.log_level') or vim.log.levels.WARN
+  local log_level = M._merged.onion and M._merged.onion.config and M._merged.onion.config.log_level
+    or vim.log.levels.WARN
   if level < log_level then
     return
   end
