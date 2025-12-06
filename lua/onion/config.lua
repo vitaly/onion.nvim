@@ -144,14 +144,21 @@ end
 ---@param path string
 ---@return any
 function M.get(path)
-  return get_by_path(M._merged, path)
+  return vim.deepcopy(get_by_path(M._merged, path))
 end
 
 ---Get a value from the defaults using dot notation
 ---@param path string
 ---@return any
 function M.get_default(path)
-  return get_by_path(M._defaults, path)
+  return vim.deepcopy(get_by_path(M._defaults, path))
+end
+
+---Get a value from the user overrides using dot notation
+---@param path string
+---@return any
+function M.get_user(path)
+  return vim.deepcopy(get_by_path(M._user, path))
 end
 
 ---Set a user value using dot notation
@@ -164,40 +171,52 @@ function M.set(path, value)
   maybe_auto_save()
 end
 
----Reset config state
----@param path? string Optional path to reset. If nil, resets all state.
+---Reset user overrides
+---@param path? string Optional path to reset. If nil, resets all user overrides.
 function M.reset(path)
   if path == nil then
-    log(vim.log.levels.DEBUG, 'resetting all config state')
-    M._defaults = {}
+    log(vim.log.levels.DEBUG, 'resetting all user overrides')
     M._user = {}
-    M._merged = {}
+    update_merged()
   else
-    log(vim.log.levels.DEBUG, 'resetting config at path: %s', path)
-    delete_by_path(M._defaults, path)
+    log(vim.log.levels.DEBUG, 'resetting user override at path: %s', path)
     delete_by_path(M._user, path)
     update_merged()
   end
 end
 
+---Reset all config state including defaults (useful for testing)
+function M.reset_all()
+  log(vim.log.levels.DEBUG, 'resetting all config state')
+  M._defaults = {}
+  M._user = {}
+  M._merged = {}
+end
+
 ---Load user overrides from a Lua file
----@param path string
+---@param path? string Optional path. If nil, uses the path from setup options.
 ---@return boolean success
-local function load_user_config(path)
-  local file = io.open(path, 'r')
+function M.load(path)
+  local load_path = path or M.get('onion.config.save_path')
+  if not load_path then
+    log(vim.log.levels.ERROR, 'load() called without path and no save_path configured in setup')
+    return false
+  end
+
+  local file = io.open(load_path, 'r')
   if not file then
-    log(vim.log.levels.DEBUG, 'no saved config found at: %s', path)
+    log(vim.log.levels.DEBUG, 'no saved config found at: %s', load_path)
     return false
   end
   file:close()
 
-  local ok, data = pcall(dofile, path)
+  local ok, data = pcall(dofile, load_path)
   if not ok or type(data) ~= 'table' then
-    log(vim.log.levels.ERROR, 'failed to parse saved config at: %s', path)
+    log(vim.log.levels.ERROR, 'failed to parse saved config at: %s', load_path)
     return false
   end
 
-  log(vim.log.levels.INFO, 'loaded user config from: %s', path)
+  log(vim.log.levels.INFO, 'loaded user config from: %s', load_path)
   M._user = deep_merge(M._user, data)
   update_merged()
   return true
@@ -250,7 +269,7 @@ function M.setup(opts)
 
   -- Load user overrides from save_path if configured
   if opts.save_path then
-    load_user_config(opts.save_path)
+    M.load(opts.save_path)
   end
 
   -- Setup auto-save on exit if enabled

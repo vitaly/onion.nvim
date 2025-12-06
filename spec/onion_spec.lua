@@ -1,6 +1,20 @@
----@diagnostic disable: need-check-nil
+---@diagnostic disable: need-check-nil, unused-local
 
 local inspect = require('inspect')
+
+---Deep copy implementation for test stub
+---@param t any
+---@return any
+local function deepcopy(t)
+  if type(t) ~= 'table' then
+    return t
+  end
+  local result = {}
+  for k, v in pairs(t) do
+    result[k] = deepcopy(v)
+  end
+  return result
+end
 
 -- Stub vim global for busted tests
 _G.vim = {
@@ -17,6 +31,7 @@ _G.vim = {
   end,
 
   inspect = inspect,
+  deepcopy = deepcopy,
 
   fn = {
     fnamemodify = function(path, mod)
@@ -25,14 +40,21 @@ _G.vim = {
       end
       return path
     end,
-    isdirectory = function()
+    ---@param path string
+    isdirectory = function(path)
       return 1
     end,
-    mkdir = function() end,
+    ---@param path string
+    ---@param flags? string
+    mkdir = function(path, flags) end,
   },
   api = {
-    nvim_create_autocmd = function() end,
-    nvim_create_augroup = function()
+    ---@param event string|string[]
+    ---@param opts any
+    nvim_create_autocmd = function(event, opts) end,
+    ---@param name string
+    ---@param opts any
+    nvim_create_augroup = function(name, opts)
       return 1
     end,
   },
@@ -44,7 +66,7 @@ describe('onion.config', function()
   before_each(function()
     package.loaded['onion.config'] = nil
     config = require('onion.config')
-    config.reset()
+    config.reset_all()
   end)
 
   describe('set_defaults', function()
@@ -126,38 +148,84 @@ describe('onion.config', function()
   end)
 
   describe('reset', function()
-    it('clears all state when called without arguments', function()
+    it('clears user overrides but keeps defaults', function()
       config.set_defaults('test', { value = 1 })
       config.set('test.other', 2)
       config.reset()
 
-      assert.is_nil(config.get('test.value'))
+      -- defaults are preserved
+      assert.are.equal(1, config.get('test.value'))
+      -- user overrides are cleared
       assert.is_nil(config.get('test.other'))
     end)
 
-    it('resets only the specified path', function()
+    it('resets only the specified user override path', function()
       config.set_defaults('formatting', { enabled = true })
       config.set_defaults('lsp', { servers = {} })
       config.set('formatting.enabled', false)
+      config.set('lsp.extra', 'value')
 
-      config.reset('formatting')
+      config.reset('formatting.enabled')
 
-      assert.is_nil(config.get('formatting.enabled'))
-      assert.are.same({}, config.get('lsp.servers'))
+      -- reset user override, falls back to default
+      assert.are.equal(true, config.get('formatting.enabled'))
+      -- other user overrides preserved
+      assert.are.equal('value', config.get('lsp.extra'))
     end)
 
-    it('resets nested paths', function()
+    it('resets nested user override paths', function()
       config.set_defaults('lsp', {
         servers = {
           lua_ls = { cmd = { 'lua-language-server' } },
           ruby_lsp = { cmd = { 'ruby-lsp' } },
         },
       })
+      config.set('lsp.servers.lua_ls.extra', 'user-value')
 
-      config.reset('lsp.servers.lua_ls')
+      config.reset('lsp.servers.lua_ls.extra')
 
-      assert.is_nil(config.get('lsp.servers.lua_ls'))
-      assert.are.same({ 'ruby-lsp' }, config.get('lsp.servers.ruby_lsp.cmd'))
+      assert.is_nil(config.get('lsp.servers.lua_ls.extra'))
+      -- defaults preserved
+      assert.are.same({ 'lua-language-server' }, config.get('lsp.servers.lua_ls.cmd'))
+    end)
+  end)
+
+  describe('get_user', function()
+    it('returns only user overrides', function()
+      config.set_defaults('test', { default_value = 1 })
+      config.set('test.user_value', 2)
+
+      assert.is_nil(config.get_user('test.default_value'))
+      assert.are.equal(2, config.get_user('test.user_value'))
+    end)
+  end)
+
+  describe('deep copy protection', function()
+    it('get returns a copy that cannot modify internal state', function()
+      config.set_defaults('test', { nested = { value = 1 } })
+
+      local result = config.get('test.nested')
+      result.value = 999
+
+      assert.are.equal(1, config.get('test.nested.value'))
+    end)
+
+    it('get_default returns a copy that cannot modify internal state', function()
+      config.set_defaults('test', { nested = { value = 1 } })
+
+      local result = config.get_default('test.nested')
+      result.value = 999
+
+      assert.are.equal(1, config.get_default('test.nested.value'))
+    end)
+
+    it('get_user returns a copy that cannot modify internal state', function()
+      config.set('test.nested.value', 1)
+
+      local result = config.get_user('test.nested')
+      result.value = 999
+
+      assert.are.equal(1, config.get_user('test.nested.value'))
     end)
   end)
 
@@ -232,6 +300,52 @@ describe('onion.config', function()
     it('fails when no path available', function()
       config.setup({})
       local result = config.save()
+      assert.is_false(result)
+    end)
+  end)
+
+  describe('load', function()
+    local test_file = './test/onion_test_config.lua'
+
+    after_each(function()
+      os.remove(test_file)
+    end)
+
+    it('loads user config from specified path', function()
+      -- Create a test file
+      local file = io.open(test_file, 'w')
+      file:write('return { test = { value = 42 } }\n')
+      file:close()
+
+      local result = config.load(test_file)
+
+      assert.is_true(result)
+      assert.are.equal(42, config.get('test.value'))
+    end)
+
+    it('uses save_path from setup when no path given', function()
+      -- Create a test file
+      local file = io.open(test_file, 'w')
+      file:write('return { test = { loaded = true } }\n')
+      file:close()
+
+      config.setup({ save_path = test_file })
+      -- reset user to clear what setup loaded
+      config.reset()
+      local result = config.load()
+
+      assert.is_true(result)
+      assert.are.equal(true, config.get('test.loaded'))
+    end)
+
+    it('fails when no path available', function()
+      config.setup({})
+      local result = config.load()
+      assert.is_false(result)
+    end)
+
+    it('returns false for non-existent file', function()
+      local result = config.load('/nonexistent/path/config.lua')
       assert.is_false(result)
     end)
   end)
