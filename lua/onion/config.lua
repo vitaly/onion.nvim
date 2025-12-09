@@ -190,12 +190,12 @@ function M.reset(path)
   if path == nil then
     log(vim.log.levels.DEBUG, 'resetting all user overrides')
     M._user = {}
-    update_merged()
   else
     log(vim.log.levels.DEBUG, 'resetting user override at path: %s', path)
     delete_by_path(M._user, path)
-    update_merged()
   end
+  update_merged()
+  maybe_auto_save()
 end
 
 ---Reset all config state including defaults (useful for testing)
