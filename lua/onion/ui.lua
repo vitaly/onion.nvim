@@ -1,3 +1,4 @@
+---@type OnionConfig
 local config = require('onion.config')
 
 local M = {}

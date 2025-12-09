@@ -235,6 +235,20 @@ function M.load(path)
   return true
 end
 
+---Generate commented default config for reference
+---@param tbl table
+---@return string
+local function generate_commented_defaults(tbl)
+  local defaults_str = vim.inspect(tbl, { newline = '\n', indent = '  ' })
+  local lines = {}
+
+  for line in defaults_str:gmatch('[^\n]+') do
+    table.insert(lines, '-- ' .. line)
+  end
+
+  return table.concat(lines, '\n')
+end
+
 ---Save user overrides to a Lua file
 ---@param path? string Optional path. If nil, uses the path from setup options.
 ---@return boolean success
@@ -257,8 +271,21 @@ function M.save(path)
     return false
   end
 
+  local lines = {}
+
+  -- Write user config
   local lua_str = vim.inspect(M._user, { newline = '\n', indent = '  ' })
-  file:write('return ' .. lua_str .. '\n')
+  table.insert(lines, 'return ' .. lua_str)
+
+  -- If there are defaults, add commented defaults for reference
+  if not vim.tbl_isempty(M._defaults) then
+    table.insert(lines, '')
+    table.insert(lines, '-- Default values for reference:')
+    local default_content = generate_commented_defaults(M._defaults)
+    table.insert(lines, default_content)
+  end
+
+  file:write(table.concat(lines, '\n') .. '\n')
   file:close()
   log(vim.log.levels.INFO, 'saved user config to: %s', save_path)
   return true
