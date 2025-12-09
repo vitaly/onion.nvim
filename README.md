@@ -125,6 +125,12 @@ config.set('nested.key', value)
 config.get('key')
 config.get('nested.key')
 
+-- Get with default value (useful for toggling boolean settings)
+config.get('feature.enabled', true)  -- Returns true if feature.enabled is not set
+
+-- Example: toggling a setting with a default of true
+config.set('something.enabled', not config.get('something.enabled', true))
+
 -- Get only the default value
 config.get_default('key')
 

@@ -150,9 +150,14 @@ end
 
 ---Get a value from the merged config using dot notation
 ---@param path string
+---@param default? any Default value to return if path doesn't exist
 ---@return any
-function M.get(path)
-  return vim.deepcopy(get_by_path(M._merged, path))
+function M.get(path, default)
+  local value = get_by_path(M._merged, path)
+  if value == nil then
+    return default
+  end
+  return vim.deepcopy(value)
 end
 
 ---Get a value from the defaults using dot notation

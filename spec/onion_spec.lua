@@ -122,6 +122,17 @@ describe('onion.config', function()
       assert.is_nil(config.get('nonexistent.nested.path'))
     end)
 
+    it('returns default value for non-existent paths when provided', function()
+      assert.is_true(config.get('nonexistent', true))
+      assert.are.equal('default', config.get('nonexistent.path', 'default'))
+      assert.are.equal(42, config.get('missing.number', 42))
+    end)
+
+    it('returns actual value even when default provided', function()
+      config.set_defaults('test.value', 'actual')
+      assert.are.equal('actual', config.get('test.value', 'default'))
+    end)
+
     it('returns values using dot notation', function()
       config.set_defaults('lsp', {
         servers = {
