@@ -9,11 +9,13 @@
 ---@field private _defaults table
 ---@field private _user table
 ---@field private _merged table
+---@field private _modified boolean
 local M = {}
 
 M._defaults = {}
 M._user = {}
 M._merged = {}
+M._modified = false
 
 ---Log a message at the specified level
 ---@param level number
@@ -181,6 +183,7 @@ function M.set(path, value)
   log(vim.log.levels.DEBUG, 'setting user config: %s', path)
   set_by_path(M._user, path, value)
   update_merged()
+  M._modified = true
   maybe_auto_save()
 end
 
@@ -195,6 +198,7 @@ function M.reset(path)
     delete_by_path(M._user, path)
   end
   update_merged()
+  M._modified = true
   maybe_auto_save()
 end
 
@@ -232,6 +236,7 @@ function M.load(path)
   log(vim.log.levels.INFO, 'loaded user config from: %s', load_path)
   M._user = deep_merge(M._user, data)
   update_merged()
+  M._modified = false
   return true
 end
 
@@ -287,6 +292,7 @@ function M.save(path)
 
   file:write(table.concat(lines, '\n') .. '\n')
   file:close()
+  M._modified = false
   log(vim.log.levels.INFO, 'saved user config to: %s', save_path)
   return true
 end
@@ -324,8 +330,10 @@ function M.setup(opts)
     vim.api.nvim_create_autocmd('VimLeavePre', {
       group = vim.api.nvim_create_augroup('OnionAutoSave', { clear = true }),
       callback = function()
-        log(vim.log.levels.DEBUG, 'auto-saving on exit')
-        M.save()
+        if M._modified then
+          log(vim.log.levels.DEBUG, 'auto-saving on exit')
+          M.save()
+        end
       end,
     })
   end
