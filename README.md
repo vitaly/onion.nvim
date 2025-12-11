@@ -113,9 +113,9 @@ config.set_defaults('key', value)
 config.set_defaults('nested.key', value)
 config.set_defaults('lsp', { servers = { lua_ls = {} } })
 
--- Set user overrides
-config.set('key', value)
-config.set('nested.key', value)
+-- Set user overrides (returns the merged value)
+local current_value = config.set('key', value)
+local nested_value = config.set('nested.key', value)
 ```
 
 ### Getting Values
@@ -141,11 +141,30 @@ config.get_user('key')
 ### Reset
 
 ```lua
--- Reset all user overrides (defaults are preserved)
-config.reset()
+-- Reset all user overrides (defaults are preserved, returns the defaults table)
+local defaults = config.reset()
 
--- Reset specific path
-config.reset('formatting.indent')
+-- Reset specific path (returns the default value at that path)
+local default_value = config.reset('formatting.indent')
+```
+
+### Toggle
+
+```lua
+-- Toggle a boolean value. returns the new value.
+local new_value = config.toggle('feature.enabled')  -- toggles from default true to false
+
+-- Toggle a boolean value, with default (used instead of nil current value). returns the new value
+-- Assuming no value is set, toggle will set it to `false` first time around.
+local new_value = config.toggle('feature.enabled', true)  -- toggles from default true to false
+
+-- Toggle existing boolean value
+config.set('debug.mode', false)
+local enabled = config.toggle('debug.mode', false)  -- returns true, sets to true
+
+-- Errors if the value is not boolean
+config.set('invalid', 'string')
+config.toggle('invalid', true)  -- throws error
 ```
 
 ### Save/Load

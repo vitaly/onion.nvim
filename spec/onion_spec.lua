@@ -32,6 +32,9 @@ _G.vim = {
 
   inspect = inspect,
   deepcopy = deepcopy,
+  tbl_isempty = function(t)
+    return next(t) == nil
+  end,
 
   fn = {
     fnamemodify = function(path, mod)
@@ -176,6 +179,20 @@ describe('onion.config', function()
       assert.are.same({ 'bashls', 'stylua' }, config.get('lsp.ensure_installed'))
       assert.are.same({ 'ts_ls' }, config.get('lsp.enable'))
     end)
+
+    it('returns the merged value after setting', function()
+      config.set_defaults('test', { value = 'default' })
+      local result = config.set('test.value', 'override')
+
+      assert.are.equal('override', result)
+      assert.are.equal('override', config.get('test.value'))
+    end)
+
+    it('returns the set value when no default exists', function()
+      local result = config.set('new.path', 42)
+      assert.are.equal(42, result)
+      assert.are.equal(42, config.get('new.path'))
+    end)
   end)
 
   describe('reset', function()
@@ -219,6 +236,36 @@ describe('onion.config', function()
       -- defaults preserved
       assert.are.same({ 'lua-language-server' }, config.get('lsp.servers.lua_ls.cmd'))
     end)
+
+    it('returns the default value after resetting a path', function()
+      config.set_defaults('test.value', 'default')
+      config.set('test.value', 'override')
+
+      local result = config.reset('test.value')
+
+      assert.are.equal('default', result)
+      assert.are.equal('default', config.get('test.value'))
+    end)
+
+    it('returns nil when resetting a path with no default', function()
+      config.set('user.only', 'value')
+
+      local result = config.reset('user.only')
+
+      assert.is_nil(result)
+      assert.is_nil(config.get('user.only'))
+    end)
+
+    it('returns the entire defaults table when resetting all', function()
+      config.set_defaults('test', { value = 1 })
+      config.set('user', { value = 2 })
+
+      local result = config.reset()
+
+      assert.are.same({ test = { value = 1 } }, result)
+      assert.are.equal(1, config.get('test.value'))
+      assert.is_nil(config.get('user.value'))
+    end)
   end)
 
   describe('get_user', function()
@@ -228,6 +275,60 @@ describe('onion.config', function()
 
       assert.is_nil(config.get_user('test.default_value'))
       assert.are.equal(2, config.get_user('test.user_value'))
+    end)
+  end)
+
+  describe('toggle', function()
+    it('toggles a nil value to true', function()
+      local result = config.toggle('test.bool')
+
+      assert.are.equal(true, result)
+      assert.are.equal(true, config.get('test.bool'))
+    end)
+
+    it('toggles a boolean value from true to false', function()
+      config.set('test.bool', true)
+      local result = config.toggle('test.bool', false)
+
+      assert.are.equal(false, result)
+      assert.are.equal(false, config.get('test.bool'))
+    end)
+
+    it('toggles a boolean value from false to true', function()
+      config.set('test.bool', false)
+      local result = config.toggle('test.bool', true)
+
+      assert.are.equal(true, result)
+      assert.are.equal(true, config.get('test.bool'))
+    end)
+
+    it('uses default value when path not set', function()
+      local result = config.toggle('test.new_bool', true)
+
+      assert.are.equal(false, result)
+      assert.are.equal(false, config.get('test.new_bool'))
+    end)
+
+    it('fails with error when current value is not boolean', function()
+      config.set('test.string', 'hello')
+      assert.has_error(function()
+        config.toggle('test.string', true)
+      end)
+      assert.are.equal('hello', config.get('test.string'))
+    end)
+
+    it('fails with error when default is not boolean and path not set', function()
+      assert.has_error(function()
+        config.toggle('test.new', 'not_boolean')
+      end)
+      assert.is_nil(config.get('test.new'))
+    end)
+
+    it('works with nil current value and boolean default', function()
+      local result = config.toggle('test.nil_bool', false)
+
+      assert.are.equal(true, result)
+      assert.are.equal(true, config.get('test.nil_bool'))
     end)
   end)
 

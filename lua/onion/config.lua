@@ -177,18 +177,23 @@ function M.get_user(path)
 end
 
 ---Set a user value using dot notation
+---Returns merged value for the path
 ---@param path string
 ---@param value any
+---@return any
 function M.set(path, value)
   log(vim.log.levels.DEBUG, 'setting user config: %s', path)
   set_by_path(M._user, path, value)
   update_merged()
   M._modified = true
   maybe_auto_save()
+  return M.get(path)
 end
 
 ---Reset user overrides
+---Returns the defaults at the path
 ---@param path? string Optional path to reset. If nil, resets all user overrides.
+---@return any
 function M.reset(path)
   if path == nil then
     log(vim.log.levels.DEBUG, 'resetting all user overrides')
@@ -200,6 +205,22 @@ function M.reset(path)
   update_merged()
   M._modified = true
   maybe_auto_save()
+  return M.get(path or '')
+end
+
+---Toggle a boolean value at the given path
+---@param path string
+---@param default? boolean Default value to use if path not found
+---@return boolean The new toggled value
+function M.toggle(path, default)
+  local current = M.get(path, default)
+  if current ~= nil and type(current) ~= 'boolean' then
+    error(
+      string.format('cannot toggle non-boolean value at path: %s (type: %s)', path, type(current))
+    )
+  end
+  local new_value = not current
+  return M.set(path, new_value)
 end
 
 ---Reset all config state including defaults (useful for testing)
