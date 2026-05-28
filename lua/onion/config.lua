@@ -37,7 +37,8 @@ local function assert_setup()
   if not M._setup_called then
     log(
       vim.log.levels.ERROR,
-      'accessing config before setup() was called. Call require("onion").setup({...}) first.'
+      'accessing config before setup() was called. Call require("onion").setup({...}) first.\n%s',
+      debug.traceback()
     )
   end
 end
