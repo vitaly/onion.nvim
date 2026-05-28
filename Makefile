@@ -14,11 +14,6 @@ cyan    = \033[1m\033[36m
 white   = \033[1m\033[37m
 
 help:: ## print help
-	@echo "\n\
-	  ${yellow}FOO             ${blue}${FOO}\n\
-	  ${yellow}BAR             ${blue}${FOO}\n\
-	  ${none}\
-	  "
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n\n  make ${cyan}<target>${none}\n\n"}  \
 	  /^[a-zA-Z_\/%$${}.-]+:.*?##/ { printf "\n  ${cyan}%-15s${none}%s\n", $$1, $$2 } \
 	  /^## / { printf "  %-15s%s\n", "", substr($$0, 3) } \
@@ -26,7 +21,7 @@ help:: ## print help
 	' $(MAKEFILE_LIST)
 .PHONY: help
 
-## DEPS
+##@ deps
 
 install-deps: ## install dependencies
 	luarocks install --local busted
