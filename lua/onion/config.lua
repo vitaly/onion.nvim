@@ -37,8 +37,7 @@ local function assert_setup()
   if not M._setup_called then
     log(
       vim.log.levels.ERROR,
-      'accessing config before setup() was called. '
-        .. 'Call require("onion").setup({...}) first.'
+      'accessing config before setup() was called. Call require("onion").setup({...}) first.'
     )
   end
 end
@@ -345,12 +344,16 @@ end
 function M.setup(opts)
   opts = opts or {}
 
+  log(vim.log.levels.DEBUG, 'setup called with opts: %s', vim.inspect(opts))
+
   if M._setup_called then
     if not vim.deep_equal(opts, M._setup_opts) then
       error(
         '[onion] setup() called again with different options.\n'
-          .. 'Original: ' .. vim.inspect(M._setup_opts)
-          .. '\nNew: ' .. vim.inspect(opts)
+          .. 'Original: '
+          .. vim.inspect(M._setup_opts)
+          .. '\nNew: '
+          .. vim.inspect(opts)
       )
     end
     return
@@ -374,8 +377,6 @@ function M.setup(opts)
       M.set_defaults(namespace, defaults)
     end
   end
-
-  log(vim.log.levels.DEBUG, 'setup called with opts: %s', vim.inspect(opts))
 
   -- Load user overrides from save_path if configured
   if opts.save_path then

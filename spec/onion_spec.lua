@@ -16,6 +16,9 @@ local function deepcopy(t)
   return result
 end
 
+local notify_calls = {}
+local suppress_notify = false
+
 -- Stub vim global for busted tests
 _G.vim = {
   log = {
@@ -26,10 +29,11 @@ _G.vim = {
       ERROR = 4,
     },
   },
-  notify_calls = {},
   notify = function(message, level)
-    table.insert(vim.notify_calls, { message = message, level = level })
-    print('Vim Notify [' .. level .. ']: ' .. message)
+    table.insert(notify_calls, { message = message, level = level })
+    if not suppress_notify then
+      print('Vim Notify [' .. level .. ']: ' .. message)
+    end
   end,
 
   inspect = inspect,
@@ -92,17 +96,19 @@ _G.vim = {
 describe('onion.config', function()
   local config
 
-  before_each(function()
+  function _reset()
     package.loaded['onion.config'] = nil
     config = require('onion.config')
     config.reset_all()
-    vim.notify_calls = {}
+    notify_calls = {}
+  end
+
+  before_each(function()
+    _reset()
+    config.setup()
   end)
 
   describe('set_defaults', function()
-    before_each(function()
-      config.setup({})
-    end)
     it('sets defaults for a path with table value', function()
       config.set_defaults('formatting', { enabled = true })
       assert.are.equal(true, config.get('formatting.enabled'))
@@ -150,10 +156,6 @@ describe('onion.config', function()
   end)
 
   describe('get', function()
-    before_each(function()
-      config.setup({})
-    end)
-
     it('returns nil for non-existent paths', function()
       assert.is_nil(config.get('nonexistent'))
       assert.is_nil(config.get('nonexistent.nested.path'))
@@ -181,10 +183,6 @@ describe('onion.config', function()
   end)
 
   describe('get_default', function()
-    before_each(function()
-      config.setup({})
-    end)
-
     it('returns the default value even if user override exists', function()
       config.set_defaults('formatting', { enabled = true })
       config.set('formatting.enabled', false)
@@ -195,10 +193,6 @@ describe('onion.config', function()
   end)
 
   describe('set', function()
-    before_each(function()
-      config.setup({})
-    end)
-
     it('overrides default values', function()
       config.set_defaults('formatting', { enabled = true })
       config.set('formatting.enabled', false)
@@ -238,10 +232,6 @@ describe('onion.config', function()
   end)
 
   describe('reset', function()
-    before_each(function()
-      config.setup({})
-    end)
-
     it('clears user overrides but keeps defaults', function()
       config.set_defaults('test', { value = 1 })
       config.set('test.other', 2)
@@ -315,10 +305,6 @@ describe('onion.config', function()
   end)
 
   describe('get_user', function()
-    before_each(function()
-      config.setup({})
-    end)
-
     it('returns only user overrides', function()
       config.set_defaults('test', { default_value = 1 })
       config.set('test.user_value', 2)
@@ -329,10 +315,6 @@ describe('onion.config', function()
   end)
 
   describe('toggle', function()
-    before_each(function()
-      config.setup({})
-    end)
-
     it('toggles a nil value to true', function()
       local result = config.toggle('test.bool')
 
@@ -387,10 +369,6 @@ describe('onion.config', function()
   end)
 
   describe('deep copy protection', function()
-    before_each(function()
-      config.setup({})
-    end)
-
     it('get returns a copy that cannot modify internal state', function()
       config.set_defaults('test', { nested = { value = 1 } })
 
@@ -420,6 +398,8 @@ describe('onion.config', function()
   end)
 
   describe('setup', function()
+    before_each(_reset)
+
     it('stores options in defaults under onion.config', function()
       config.setup({
         log_level = vim.log.levels.DEBUG,
@@ -467,7 +447,7 @@ describe('onion.config', function()
     end)
 
     it('saves user config to specified path in Lua format', function()
-      config.setup({})
+      config.setup()
       config.set('test.value', 42)
       local result = config.save(test_file)
 
@@ -482,7 +462,7 @@ describe('onion.config', function()
     end)
 
     it('saves config that can be loaded with dofile', function()
-      config.setup({})
+      config.setup()
       config.set('test.value', 42)
       config.set('test.name', 'hello')
       config.save(test_file)
@@ -493,6 +473,7 @@ describe('onion.config', function()
     end)
 
     it('uses save_path from setup when no path given', function()
+      config.reset_all()
       config.setup({ save_path = test_file })
       config.set('test.value', 123)
 
@@ -505,6 +486,7 @@ describe('onion.config', function()
     end)
 
     it('fails when no path available', function()
+      suppress_notify = true
       config.setup({})
       local result = config.save()
       assert.is_false(result)
@@ -537,6 +519,7 @@ describe('onion.config', function()
       file:write('return { test = { loaded = true } }\n')
       file:close()
 
+      config.reset_all()
       config.setup({ save_path = test_file })
       -- reset user to clear what setup loaded
       config.reset()
@@ -561,25 +544,22 @@ describe('onion.config', function()
 
   describe('setup guard', function()
     before_each(function()
-      package.loaded['onion.config'] = nil
-      config = require('onion.config')
-      config.reset_all()
-      config._testing = nil
-      vim.notify_calls = {}
+      _reset()
+      suppress_notify = true
     end)
 
     it('logs error when get is called before setup', function()
       config.get('anything')
 
-      assert.are.equal(1, #vim.notify_calls)
-      assert.are.equal(vim.log.levels.ERROR, vim.notify_calls[1].level)
+      assert.are.equal(1, #notify_calls)
+      assert.are.equal(vim.log.levels.ERROR, notify_calls[1].level)
     end)
 
     it('logs error when set is called before setup', function()
       config.set('test', 'value')
 
-      assert.is_true(#vim.notify_calls > 0)
-      assert.are.equal(vim.log.levels.ERROR, vim.notify_calls[1].level)
+      assert.is_true(#notify_calls > 0)
+      assert.are.equal(vim.log.levels.ERROR, notify_calls[1].level)
     end)
 
     it('setup with different opts errors', function()
