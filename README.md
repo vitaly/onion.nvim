@@ -205,6 +205,47 @@ return {
 }
 ```
 
+## lazy.nvim Pre-cloning
+
+When using lazy.nvim, specs are evaluated before any plugin is cloned or loaded.
+This means you **cannot** influence spec shape with onion — e.g.
+`require(require('onion.config').get('completion.provider'))` or
+`enabled = function() require('onion.config').get('telescope.enabled') end` will not
+work, because onion.nvim may not even exist on disk yet at that point.
+
+If you need to use onion values inside lazy specs, pre-clone onion.nvim **before**
+lazy.nvim is loaded, the same way lazy.nvim itself is bootstrapped:
+
+```lua
+local onion_path = vim.fn.stdpath('data') .. '/lazy/onion.nvim'
+if not (vim.uv or vim.loop).fs_stat(onion_path) then
+  local repo = 'https://github.com/vitaly/onion.nvim.git'
+  local out = vim.fn.system({ 'git', 'clone', '--filter=blob:none', repo, onion_path })
+  if vim.v.shell_error ~= 0 then
+    vim.api.nvim_echo({
+      { 'Failed to clone onion.nvim:\n', 'ErrorMsg' },
+      { out, 'WarningMsg' },
+      { '\nPress any key to exit...' },
+    }, true, {})
+    vim.fn.getchar()
+    os.exit(1)
+  end
+end
+vim.opt.rtp:prepend(onion_path)
+
+require('onion').setup({
+  save_path = vim.fn.stdpath('config') .. '/config.lua',
+  auto_save = true,
+  defaults = {
+    log_level = vim.log.levels.WARN,
+  },
+})
+```
+
+> If you use `dev = true` or `dir = '...'` in your lazy spec for onion.nvim,
+> update `onion_path` above to match where lazy.nvim will look for it, otherwise
+> they will be out of sync.
+
 ## License
 
 MIT
