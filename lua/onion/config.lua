@@ -16,6 +16,8 @@ M._defaults = {}
 M._user = {}
 M._merged = {}
 M._modified = false
+M._setup_called = false
+M._setup_opts = nil
 
 ---Log a message at the specified level
 ---@param level number
@@ -29,6 +31,16 @@ local function log(level, msg, ...)
   end
 
   vim.notify('[onion] ' .. string.format(msg, ...), level)
+end
+
+local function assert_setup()
+  if not M._setup_called and not M._testing then
+    log(
+      vim.log.levels.ERROR,
+      'accessing config before setup() was called. '
+        .. 'Call require("onion").setup({...}) first.'
+    )
+  end
 end
 
 ---Deep merge two tables, with t2 values taking precedence
@@ -155,6 +167,7 @@ end
 ---@param default? any Default value to return if path doesn't exist
 ---@return any
 function M.get(path, default)
+  assert_setup()
   local value = get_by_path(M._merged, path)
   if value == nil then
     return default
@@ -166,6 +179,7 @@ end
 ---@param path string
 ---@return any
 function M.get_default(path)
+  assert_setup()
   return vim.deepcopy(get_by_path(M._defaults, path))
 end
 
@@ -173,6 +187,7 @@ end
 ---@param path string
 ---@return any
 function M.get_user(path)
+  assert_setup()
   return vim.deepcopy(get_by_path(M._user, path))
 end
 
@@ -182,6 +197,7 @@ end
 ---@param value any
 ---@return any
 function M.set(path, value)
+  assert_setup()
   log(vim.log.levels.DEBUG, 'setting user config: %s', path)
   set_by_path(M._user, path, value)
   update_merged()
@@ -195,6 +211,7 @@ end
 ---@param path? string Optional path to reset. If nil, resets all user overrides.
 ---@return any
 function M.reset(path)
+  assert_setup()
   if path == nil then
     log(vim.log.levels.DEBUG, 'resetting all user overrides')
     M._user = {}
@@ -213,6 +230,7 @@ end
 ---@param default? boolean Default value to use if path not found
 ---@return boolean The new toggled value
 function M.toggle(path, default)
+  assert_setup()
   local current = M.get(path, default)
   if current ~= nil and type(current) ~= 'boolean' then
     error(
@@ -229,12 +247,15 @@ function M.reset_all()
   M._defaults = {}
   M._user = {}
   M._merged = {}
+  M._setup_called = false
+  M._setup_opts = nil
 end
 
 ---Load user overrides from a Lua file
 ---@param path? string Optional path. If nil, uses the path from setup options.
 ---@return boolean success
 function M.load(path)
+  assert_setup()
   local load_path = path or M.get('onion.config.save_path')
   if not load_path then
     log(vim.log.levels.ERROR, 'load() called without path and no save_path configured in setup')
@@ -279,6 +300,7 @@ end
 ---@param path? string Optional path. If nil, uses the path from setup options.
 ---@return boolean success
 function M.save(path)
+  assert_setup()
   local save_path = path or M.get('onion.config.save_path')
   if not save_path then
     log(vim.log.levels.ERROR, 'save() called without path and no save_path configured in setup')
@@ -322,6 +344,20 @@ end
 ---@param opts? OnionSetupOpts
 function M.setup(opts)
   opts = opts or {}
+
+  if M._setup_called then
+    if not vim.deep_equal(opts, M._setup_opts) then
+      error(
+        '[onion] setup() called again with different options.\n'
+          .. 'Original: ' .. vim.inspect(M._setup_opts)
+          .. '\nNew: ' .. vim.inspect(opts)
+      )
+    end
+    return
+  end
+
+  M._setup_called = true
+  M._setup_opts = vim.deepcopy(opts)
 
   -- Store setup options in defaults under onion.config
   local config_defaults = {

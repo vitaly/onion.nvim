@@ -26,7 +26,9 @@ _G.vim = {
       ERROR = 4,
     },
   },
+  notify_calls = {},
   notify = function(message, level)
+    table.insert(vim.notify_calls, { message = message, level = level })
     print('Vim Notify [' .. level .. ']: ' .. message)
   end,
 
@@ -34,6 +36,30 @@ _G.vim = {
   deepcopy = deepcopy,
   tbl_isempty = function(t)
     return next(t) == nil
+  end,
+  deep_equal = function(a, b)
+    if a == b then
+      return true
+    end
+    if type(a) ~= type(b) then
+      return false
+    end
+    if type(a) == 'table' then
+      local seen = {}
+      for k, v in pairs(a) do
+        if not vim.deep_equal(v, b[k]) then
+          return false
+        end
+        seen[k] = true
+      end
+      for k, _ in pairs(b) do
+        if not seen[k] then
+          return false
+        end
+      end
+      return true
+    end
+    return false
   end,
 
   fn = {
@@ -70,6 +96,8 @@ describe('onion.config', function()
     package.loaded['onion.config'] = nil
     config = require('onion.config')
     config.reset_all()
+    config._testing = true
+    vim.notify_calls = {}
   end)
 
   describe('set_defaults', function()
@@ -494,6 +522,48 @@ describe('onion.config', function()
     it('returns false for non-existent file', function()
       local result = config.load('/nonexistent/path/config.lua')
       assert.is_false(result)
+    end)
+  end)
+
+  describe('setup guard', function()
+    before_each(function()
+      package.loaded['onion.config'] = nil
+      config = require('onion.config')
+      config.reset_all()
+      config._testing = nil
+      vim.notify_calls = {}
+    end)
+
+    it('logs error when get is called before setup', function()
+      config.get('anything')
+
+      assert.are.equal(1, #vim.notify_calls)
+      assert.are.equal(vim.log.levels.ERROR, vim.notify_calls[1].level)
+    end)
+
+    it('logs error when set is called before setup', function()
+      config.set('test', 'value')
+
+      assert.is_true(#vim.notify_calls > 0)
+      assert.are.equal(vim.log.levels.ERROR, vim.notify_calls[1].level)
+    end)
+
+    it('setup with different opts errors', function()
+      config.setup({ save_path = '/first' })
+
+      assert.has_error(function()
+        config.setup({ save_path = '/second' })
+      end)
+    end)
+
+    it('setup with same opts does not error', function()
+      config.setup({ save_path = '/test' })
+      config.setup({ save_path = '/test' })
+    end)
+
+    it('setup with same empty opts does not error', function()
+      config.setup()
+      config.setup()
     end)
   end)
 end)

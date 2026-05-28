@@ -27,6 +27,11 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 }
 ```
 
+> `setup()` must be called before reading config — it loads saved user overrides
+> from disk. Accessing config before `setup()` logs an error and returns defaults
+> only. Calling `setup()` twice with different options throws an error; identical
+> calls are safe.
+
 ## Quick Start
 
 ```lua
