@@ -96,11 +96,13 @@ describe('onion.config', function()
     package.loaded['onion.config'] = nil
     config = require('onion.config')
     config.reset_all()
-    config._testing = true
     vim.notify_calls = {}
   end)
 
   describe('set_defaults', function()
+    before_each(function()
+      config.setup({})
+    end)
     it('sets defaults for a path with table value', function()
       config.set_defaults('formatting', { enabled = true })
       assert.are.equal(true, config.get('formatting.enabled'))
@@ -148,6 +150,10 @@ describe('onion.config', function()
   end)
 
   describe('get', function()
+    before_each(function()
+      config.setup({})
+    end)
+
     it('returns nil for non-existent paths', function()
       assert.is_nil(config.get('nonexistent'))
       assert.is_nil(config.get('nonexistent.nested.path'))
@@ -175,6 +181,10 @@ describe('onion.config', function()
   end)
 
   describe('get_default', function()
+    before_each(function()
+      config.setup({})
+    end)
+
     it('returns the default value even if user override exists', function()
       config.set_defaults('formatting', { enabled = true })
       config.set('formatting.enabled', false)
@@ -185,6 +195,10 @@ describe('onion.config', function()
   end)
 
   describe('set', function()
+    before_each(function()
+      config.setup({})
+    end)
+
     it('overrides default values', function()
       config.set_defaults('formatting', { enabled = true })
       config.set('formatting.enabled', false)
@@ -224,6 +238,10 @@ describe('onion.config', function()
   end)
 
   describe('reset', function()
+    before_each(function()
+      config.setup({})
+    end)
+
     it('clears user overrides but keeps defaults', function()
       config.set_defaults('test', { value = 1 })
       config.set('test.other', 2)
@@ -284,19 +302,23 @@ describe('onion.config', function()
       assert.is_nil(config.get('user.only'))
     end)
 
-    it('returns the entire defaults table when resetting all', function()
+    it('returns the merged config when resetting all', function()
       config.set_defaults('test', { value = 1 })
       config.set('user', { value = 2 })
 
       local result = config.reset()
 
-      assert.are.same({ test = { value = 1 } }, result)
+      assert.are.equal(1, result.test.value)
       assert.are.equal(1, config.get('test.value'))
       assert.is_nil(config.get('user.value'))
     end)
   end)
 
   describe('get_user', function()
+    before_each(function()
+      config.setup({})
+    end)
+
     it('returns only user overrides', function()
       config.set_defaults('test', { default_value = 1 })
       config.set('test.user_value', 2)
@@ -307,6 +329,10 @@ describe('onion.config', function()
   end)
 
   describe('toggle', function()
+    before_each(function()
+      config.setup({})
+    end)
+
     it('toggles a nil value to true', function()
       local result = config.toggle('test.bool')
 
@@ -361,6 +387,10 @@ describe('onion.config', function()
   end)
 
   describe('deep copy protection', function()
+    before_each(function()
+      config.setup({})
+    end)
+
     it('get returns a copy that cannot modify internal state', function()
       config.set_defaults('test', { nested = { value = 1 } })
 
@@ -437,6 +467,7 @@ describe('onion.config', function()
     end)
 
     it('saves user config to specified path in Lua format', function()
+      config.setup({})
       config.set('test.value', 42)
       local result = config.save(test_file)
 
@@ -451,6 +482,7 @@ describe('onion.config', function()
     end)
 
     it('saves config that can be loaded with dofile', function()
+      config.setup({})
       config.set('test.value', 42)
       config.set('test.name', 'hello')
       config.save(test_file)
@@ -488,6 +520,7 @@ describe('onion.config', function()
 
     it('loads user config from specified path', function()
       -- Create a test file
+      config.setup({})
       local file = io.open(test_file, 'w')
       file:write('return { test = { value = 42 } }\n')
       file:close()
@@ -520,6 +553,7 @@ describe('onion.config', function()
     end)
 
     it('returns false for non-existent file', function()
+      config.setup({})
       local result = config.load('/nonexistent/path/config.lua')
       assert.is_false(result)
     end)

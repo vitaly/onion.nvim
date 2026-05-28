@@ -34,7 +34,7 @@ local function log(level, msg, ...)
 end
 
 local function assert_setup()
-  if not M._setup_called and not M._testing then
+  if not M._setup_called then
     log(
       vim.log.levels.ERROR,
       'accessing config before setup() was called. '
